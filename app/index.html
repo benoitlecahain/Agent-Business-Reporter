@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Review Microsoft Agent 365 packages across your organization.">
+  <title>Agent Business Reporter</title>
+  <script>
+    (() => {
+      const param = new URLSearchParams(window.location.search).get("scoutTheme");
+      const theme =
+        param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/style.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@4.25.0/lib/msal-browser.min.js"></script>
+  <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script defer src="/js/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Agent Business Reporter home">
+      <span class="brand-mark"><i data-lucide="chart-no-axes-combined"></i></span>
+      <span>Agent Business Reporter</span>
+    </a>
+    <div class="identity">
+      <div id="accountBlock" class="account" hidden><span id="accountName"></span><span id="tenantName"></span></div>
+      <button id="themeButton" class="icon-button" type="button" aria-label="Change theme" title="Change theme"><i data-lucide="sun-moon"></i></button>
+      <button id="signOutButton" class="button secondary" type="button" hidden><i data-lucide="log-out"></i><span>Sign out</span></button>
+    </div>
+  </header>
+  <main>
+    <section id="signedOutView" class="signin-view">
+      <div class="signin-copy">
+        <p class="eyebrow">Microsoft Agent 365</p>
+        <h1>Your tenant’s agent portfolio, in focus.</h1>
+        <p class="lede">Connect with your work account to inspect the agents available across your organization.</p>
+        <button id="signInButton" class="button primary" type="button"><i data-lucide="log-in"></i><span>Sign in with Microsoft</span></button>
+        <p class="requirement">Requires tenant consent for <strong>CopilotPackages.Read.All</strong>.</p>
+      </div>
+      <div class="signal-grid" aria-hidden="true">
+        <div class="signal-cell accent"><i data-lucide="bot"></i></div>
+        <div class="signal-cell"><i data-lucide="shield-check"></i></div>
+        <div class="signal-cell"><i data-lucide="building-2"></i></div>
+        <div class="signal-cell wide"><span>365</span></div>
+      </div>
+    </section>
+    <section id="dashboardView" class="dashboard" hidden>
+      <div class="page-heading">
+        <div><p class="eyebrow">Organization catalog</p><h1>Agent inventory</h1></div>
+        <button id="refreshButton" class="button secondary" type="button"><i data-lucide="refresh-cw"></i><span>Refresh</span></button>
+      </div>
+      <div class="metrics" aria-label="Inventory summary">
+        <article class="metric"><span>Total agents</span><strong id="totalMetric">0</strong></article>
+        <article class="metric"><span>Available</span><strong id="availableMetric">0</strong></article>
+        <article class="metric"><span>Blocked</span><strong id="blockedMetric">0</strong></article>
+        <article class="metric"><span>Publishers</span><strong id="publisherMetric">0</strong></article>
+      </div>
+      <section class="inventory" aria-labelledby="inventoryTitle">
+        <div class="inventory-header">
+          <div><h2 id="inventoryTitle">Agents</h2><p id="resultCount" class="muted">0 results</p></div>
+          <div class="filters">
+            <label class="search-field"><i data-lucide="search"></i><span class="sr-only">Search agents</span><input id="searchInput" type="search" placeholder="Search agents or publishers"></label>
+            <label class="select-field"><span class="sr-only">Filter by status</span><select id="statusFilter"><option value="all">All statuses</option><option value="available">Available</option><option value="blocked">Blocked</option></select></label>
+          </div>
+        </div>
+        <div id="loadingState" class="state" hidden><span class="spinner" aria-hidden="true"></span><p>Loading your organization’s agents…</p></div>
+        <div id="errorState" class="state error-state" role="alert" hidden><i data-lucide="circle-alert"></i><h3>We couldn’t load the catalog</h3><p id="errorMessage"></p><button id="retryButton" class="button secondary" type="button">Try again</button></div>
+        <div id="emptyState" class="state" hidden><i data-lucide="package-open"></i><h3>No matching agents</h3><p>Adjust your filters or refresh the catalog.</p></div>
+        <div id="tableWrap" class="table-wrap" hidden>
+          <table><thead><tr><th scope="col">Agent</th><th scope="col">Publisher</th><th scope="col">Platform</th><th scope="col">Hosts</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Open details</span></th></tr></thead><tbody id="agentRows"></tbody></table>
+        </div>
+      </section>
+    </section>
+  </main>
+  <div id="drawerBackdrop" class="drawer-backdrop" hidden></div>
+  <aside id="detailDrawer" class="drawer" aria-labelledby="drawerTitle" aria-hidden="true">
+    <div class="drawer-header"><div><p class="eyebrow">Agent details</p><h2 id="drawerTitle">Agent</h2></div><button id="closeDrawerButton" class="icon-button" type="button" aria-label="Close details" title="Close details"><i data-lucide="x"></i></button></div>
+    <div id="drawerContent" class="drawer-content"></div>
+  </aside>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
