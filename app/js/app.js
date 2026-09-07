@@ -1,6 +1,5 @@
 const CLIENT_ID = "5f8259cb-61e1-402e-8d38-f38fe1a2db31";
 const GRAPH_SCOPES = ["https://graph.microsoft.com/CopilotPackages.Read.All"];
-const PRODUCTION_ORIGIN = "https://abr.msdemo.net";
 const SNAPSHOT_PREFIX = "agent-inventory";
 const elements = Object.fromEntries([
   "signedOutView", "dashboardView", "signInButton", "signOutButton", "accountBlock", "accountName", "tenantName", "importButton", "retryButton", "searchInput", "publisherFilter", "platformFilter", "hostFilter", "activeUsersFilter", "lastUsedFilter", "statusFilter", "clearFiltersButton", "loadingState", "errorState", "errorMessage", "emptyState", "emptyTitle", "emptyMessage", "tableWrap", "agentRows", "resultCount", "snapshotStatus", "totalMetric", "availableMetric", "blockedMetric", "publisherMetric", "drawerBackdrop", "drawerTitle", "drawerContent", "closeDrawerButton", "themeButton", "toast"
@@ -39,7 +38,6 @@ function createElement(tag, className, text) {
   if (text !== undefined && text !== null) element.textContent = String(text);
   return element;
 }
-function applicationOrigin() { return ["localhost", "127.0.0.1"].includes(window.location.hostname) ? window.location.origin : PRODUCTION_ORIGIN; }
 function icon(name) { const element = createElement("i"); element.dataset.lucide = name; element.setAttribute("aria-hidden", "true"); return element; }
 function refreshIcons() { if (window.lucide) window.lucide.createIcons(); }
 function showToast(message) { elements.toast.textContent = message; elements.toast.hidden = false; window.setTimeout(() => { elements.toast.hidden = true; }, 3500); }
@@ -211,12 +209,11 @@ async function signIn() {
   try { const result = await msalClient.loginPopup({ scopes: GRAPH_SCOPES, prompt: "select_account" }); account = result.account; msalClient.setActiveAccount(account); setView(true); await loadSnapshot(); }
   catch (error) { showToast(error.message || "Sign-in was not completed."); }
 }
-async function signOut() { await msalClient.logoutRedirect({ account, postLogoutRedirectUri: `${applicationOrigin()}/` }); }
+async function signOut() { await msalClient.logoutRedirect({ account, postLogoutRedirectUri: `${window.location.origin}/` }); }
 function toggleTheme() { document.documentElement.dataset.theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; }
 async function initialize() {
   refreshIcons();
-  const appOrigin = applicationOrigin();
-  msalClient = new msal.PublicClientApplication({ auth: { clientId: CLIENT_ID, authority: "https://login.microsoftonline.com/organizations", redirectUri: `${appOrigin}/`, postLogoutRedirectUri: `${appOrigin}/` }, cache: { cacheLocation: "sessionStorage" } });
+  msalClient = new msal.PublicClientApplication({ auth: { clientId: CLIENT_ID, authority: "https://login.microsoftonline.com/organizations", redirectUri: `${window.location.origin}/`, postLogoutRedirectUri: `${window.location.origin}/` }, cache: { cacheLocation: "sessionStorage" } });
   await msalClient.initialize();
   const redirectResult = await msalClient.handleRedirectPromise();
   account = redirectResult?.account || msalClient.getActiveAccount() || msalClient.getAllAccounts()[0];
