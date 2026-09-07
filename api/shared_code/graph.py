@@ -15,11 +15,8 @@ def response(payload: object, status_code: int = 200) -> func.HttpResponse:
 
 
 def access_token(request: func.HttpRequest) -> str | None:
-    authorization = request.headers.get("Authorization", "")
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not token.strip():
-        return None
-    return token.strip()
+    token = request.headers.get("X-MS-Graph-Token", "")
+    return token.strip() or None
 
 
 def graph_get(url: str, token: str, params: dict[str, str] | None = None) -> requests.Response:
