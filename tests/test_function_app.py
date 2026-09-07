@@ -1,9 +1,15 @@
 import json
+import sys
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import azure.functions as func
 
-from api.function_app import AGENTS_FILTER, GRAPH_PACKAGES_URL, get_package, list_packages
+sys.path.insert(0, str(Path(__file__).parents[1] / "api"))
+
+from package_detail import main as get_package
+from packages import main as list_packages
+from shared_code.graph import AGENTS_FILTER, GRAPH_PACKAGES_URL
 
 
 def make_request(url: str, route_params: dict[str, str] | None = None) -> func.HttpRequest:
@@ -17,7 +23,7 @@ def make_request(url: str, route_params: dict[str, str] | None = None) -> func.H
     )
 
 
-@patch("api.function_app.requests.get")
+@patch("shared_code.graph.requests.get")
 def test_list_packages_filters_agents_and_forwards_token(graph_get: Mock) -> None:
     graph_get.return_value = Mock(
         ok=True,
@@ -39,7 +45,7 @@ def test_list_packages_filters_agents_and_forwards_token(graph_get: Mock) -> Non
     )
 
 
-@patch("api.function_app.requests.get")
+@patch("shared_code.graph.requests.get")
 def test_get_package_encodes_id(graph_get: Mock) -> None:
     graph_get.return_value = Mock(ok=True, json=lambda: {"id": "package/one"})
 
