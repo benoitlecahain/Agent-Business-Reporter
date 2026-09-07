@@ -1,7 +1,7 @@
 const CLIENT_ID = "5f8259cb-61e1-402e-8d38-f38fe1a2db31";
 const GRAPH_SCOPES = ["https://graph.microsoft.com/CopilotPackages.Read.All"];
 const elements = Object.fromEntries([
-  "signedOutView", "dashboardView", "signInButton", "signOutButton", "accountBlock", "accountName", "tenantName", "refreshButton", "retryButton", "searchInput", "statusFilter", "loadingState", "errorState", "errorMessage", "emptyState", "tableWrap", "agentRows", "resultCount", "totalMetric", "availableMetric", "blockedMetric", "publisherMetric", "drawerBackdrop", "drawerTitle", "drawerContent", "closeDrawerButton", "themeButton", "toast"
+  "signedOutView", "dashboardView", "signInButton", "signOutButton", "accountBlock", "accountName", "tenantName", "refreshButton", "retryButton", "searchInput", "publisherFilter", "platformFilter", "hostFilter", "activeUsersFilter", "lastUsedFilter", "statusFilter", "clearFiltersButton", "loadingState", "errorState", "errorMessage", "emptyState", "tableWrap", "agentRows", "resultCount", "totalMetric", "availableMetric", "blockedMetric", "publisherMetric", "drawerBackdrop", "drawerTitle", "drawerContent", "closeDrawerButton", "themeButton", "toast"
 ].map((id) => [id, document.querySelector(`#${id}`)]));
 elements.drawer = document.querySelector("#detailDrawer");
 let msalClient;
@@ -51,13 +51,48 @@ function updateMetrics() {
   elements.blockedMetric.textContent = blocked;
   elements.publisherMetric.textContent = new Set(packages.map((item) => item.publisher).filter(Boolean)).size;
 }
+function setFilterOptions(select, values, allLabel) {
+  const selected = select.value;
+  const allOption = createElement("option", "", allLabel);
+  allOption.value = "all";
+  select.replaceChildren(allOption);
+  [...new Set(values.filter(Boolean))].sort((left, right) => left.localeCompare(right)).forEach((value) => {
+    const option = createElement("option", "", value);
+    option.value = value;
+    select.append(option);
+  });
+  select.value = [...select.options].some((option) => option.value === selected) ? selected : "all";
+}
+function updateFilterOptions() {
+  setFilterOptions(elements.publisherFilter, packages.map((item) => item.publisher), "All publishers");
+  setFilterOptions(elements.platformFilter, packages.map((item) => item.platform), "All platforms");
+  setFilterOptions(elements.hostFilter, packages.flatMap((item) => item.supportedHosts || []), "All hosts");
+}
 function filteredPackages() {
   const query = elements.searchInput.value.trim().toLocaleLowerCase();
+  const publisher = elements.publisherFilter.value;
+  const platform = elements.platformFilter.value;
+  const host = elements.hostFilter.value;
+  const activeUsers = elements.activeUsersFilter.value;
+  const lastUsed = elements.lastUsedFilter.value;
   const status = elements.statusFilter.value;
   return packages.filter((item) => {
-    const searchable = [item.displayName, item.publisher, item.shortDescription, item.platform].filter(Boolean).join(" ").toLocaleLowerCase();
-    return (!query || searchable.includes(query)) && (status === "all" || (status === "blocked" ? item.isBlocked : !item.isBlocked));
+    const usage = Number(item.activeUsers || 0);
+    const usedDate = item.lastUsedDateTime ? new Date(item.lastUsedDateTime) : null;
+    const usedAfter = lastUsed !== "all" && lastUsed !== "never" ? Date.now() - Number(lastUsed) * 86400000 : null;
+    return (!query || (item.displayName || "").toLocaleLowerCase().includes(query))
+      && (publisher === "all" || item.publisher === publisher)
+      && (platform === "all" || item.platform === platform)
+      && (host === "all" || item.supportedHosts?.includes(host))
+      && (activeUsers === "all" || (activeUsers === "none" ? usage === 0 : usage >= Number(activeUsers)))
+      && (lastUsed === "all" || (lastUsed === "never" ? !usedDate : usedDate && !Number.isNaN(usedDate.getTime()) && usedDate.getTime() >= usedAfter))
+      && (status === "all" || (status === "blocked" ? item.isBlocked : !item.isBlocked));
   });
+}
+function clearFilters() {
+  elements.searchInput.value = "";
+  [elements.publisherFilter, elements.platformFilter, elements.hostFilter, elements.activeUsersFilter, elements.lastUsedFilter, elements.statusFilter].forEach((select) => { select.value = "all"; });
+  renderTable();
 }
 function appendChips(cell, values) {
   const wrapper = createElement("div", "chips");
@@ -105,7 +140,7 @@ function renderTable() {
 }
 async function loadPackages() {
   showLoading();
-  try { const payload = await apiRequest("/api/packages"); packages = Array.isArray(payload.value) ? payload.value : []; updateMetrics(); elements.loadingState.hidden = true; elements.refreshButton.disabled = false; renderTable(); }
+  try { const payload = await apiRequest("/api/packages"); packages = Array.isArray(payload.value) ? payload.value : []; updateMetrics(); updateFilterOptions(); elements.loadingState.hidden = true; elements.refreshButton.disabled = false; renderTable(); }
   catch (error) { showError(error); }
 }
 function detailItem(label, value) { const wrapper = createElement("div", "detail-item"); wrapper.append(createElement("dt", "", label), createElement("dd", "", value ?? "Not specified")); return wrapper; }
@@ -145,7 +180,8 @@ elements.signOutButton.addEventListener("click", signOut);
 elements.refreshButton.addEventListener("click", loadPackages);
 elements.retryButton.addEventListener("click", loadPackages);
 elements.searchInput.addEventListener("input", renderTable);
-elements.statusFilter.addEventListener("change", renderTable);
+[elements.publisherFilter, elements.platformFilter, elements.hostFilter, elements.activeUsersFilter, elements.lastUsedFilter, elements.statusFilter].forEach((select) => select.addEventListener("change", renderTable));
+elements.clearFiltersButton.addEventListener("click", clearFilters);
 elements.closeDrawerButton.addEventListener("click", closeDetails);
 elements.drawerBackdrop.addEventListener("click", closeDetails);
 elements.themeButton.addEventListener("click", toggleTheme);

@@ -57,8 +57,14 @@
         <div class="inventory-header">
           <div><h2 id="inventoryTitle">Agents</h2><p id="resultCount" class="muted">0 results</p></div>
           <div class="filters">
-            <label class="search-field"><i data-lucide="search"></i><span class="sr-only">Search agents</span><input id="searchInput" type="search" placeholder="Search agents or publishers"></label>
+            <label class="search-field"><i data-lucide="search"></i><span class="sr-only">Search by agent name</span><input id="searchInput" type="search" placeholder="Search by agent name"></label>
+            <label class="select-field"><span class="sr-only">Filter by publisher</span><select id="publisherFilter"><option value="all">All publishers</option></select></label>
+            <label class="select-field"><span class="sr-only">Filter by platform</span><select id="platformFilter"><option value="all">All platforms</option></select></label>
+            <label class="select-field"><span class="sr-only">Filter by host</span><select id="hostFilter"><option value="all">All hosts</option></select></label>
+            <label class="select-field"><span class="sr-only">Filter by active users</span><select id="activeUsersFilter"><option value="all">Any usage</option><option value="none">No active users</option><option value="1">1+ active users</option><option value="10">10+ active users</option><option value="100">100+ active users</option><option value="1000">1,000+ active users</option></select></label>
+            <label class="select-field"><span class="sr-only">Filter by last used date</span><select id="lastUsedFilter"><option value="all">Used at any time</option><option value="7">Used in 7 days</option><option value="30">Used in 30 days</option><option value="90">Used in 90 days</option><option value="never">Never used</option></select></label>
             <label class="select-field"><span class="sr-only">Filter by status</span><select id="statusFilter"><option value="all">All statuses</option><option value="available">Available</option><option value="blocked">Blocked</option></select></label>
+            <button id="clearFiltersButton" class="button secondary clear-filters" type="button"><i data-lucide="filter-x"></i><span>Clear filters</span></button>
           </div>
         </div>
         <div id="loadingState" class="state" hidden><span class="spinner" aria-hidden="true"></span><p>Loading your organization’s agents…</p></div>
