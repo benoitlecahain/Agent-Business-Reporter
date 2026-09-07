@@ -14,29 +14,55 @@ from shared_code.graph import (
 )
 
 
-DETAIL_WORKERS = 8
+DETAIL_WORKERS = 4
+USAGE_DETAIL_ATTEMPTS = 3
 
 
-def enrich_package(package: dict, token: str) -> dict:
+def was_used(package: dict) -> bool:
+    return bool(
+        package.get("lastUsedDateTime")
+        or (package.get("activeUsers") or 0) > 0
+        or (package.get("totalSessions") or 0) > 0
+        or (package.get("totalRunTimeInHours") or 0) > 0
+    )
+
+
+def enrich_package(package: dict, token: str) -> tuple[dict, dict | None]:
     package_id = package.get("id")
     if not package_id:
-        return package
+        return package, {"id": None, "status": 400}
 
-    detail_response = graph_get(package_url(package_id), token)
-    if not detail_response.ok:
-        return package
+    enriched = package
+    for attempt in range(USAGE_DETAIL_ATTEMPTS):
+        detail_response = graph_get(package_url(package_id), token)
+        if not detail_response.ok:
+            return package, {"id": package_id, "status": detail_response.status_code}
 
-    detail = detail_response.json()
-    return {**package, **detail} if isinstance(detail, dict) else package
+        try:
+            detail = detail_response.json()
+        except ValueError:
+            return package, {"id": package_id, "status": 502}
+        if not isinstance(detail, dict):
+            return package, {"id": package_id, "status": 502}
+
+        enriched = {**package, **detail}
+        if not was_used(enriched) or enriched.get("activeUsers") is not None:
+            break
+
+    return enriched, None
 
 
-def enrich_packages(packages: list[dict], token: str) -> list[dict]:
+def enrich_packages(packages: list[dict], token: str) -> tuple[list[dict], list[dict]]:
     if not packages:
-        return packages
+        return packages, []
 
     worker_count = min(DETAIL_WORKERS, len(packages))
     with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        return list(executor.map(lambda package: enrich_package(package, token), packages))
+        results = list(executor.map(lambda package: enrich_package(package, token), packages))
+
+    enriched = [package for package, _ in results]
+    failures = [failure for _, failure in results if failure]
+    return enriched, failures
 
 
 def main(request: func.HttpRequest) -> func.HttpResponse:
@@ -58,8 +84,26 @@ def main(request: func.HttpRequest) -> func.HttpResponse:
         next_url = payload.get("@odata.nextLink")
         params = None
         if not next_url:
-            enriched_packages = enrich_packages(packages, token)
-            return response({"value": enriched_packages, "count": len(enriched_packages)})
+            enriched_packages, failures = enrich_packages(packages, token)
+            if failures:
+                return response({
+                    "error": {
+                        "message": "The import was not saved because some package details could not be retrieved.",
+                        "failedPackages": failures,
+                    }
+                }, 502)
+            used_without_active_users = sum(
+                1 for package in enriched_packages
+                if was_used(package) and package.get("activeUsers") is None
+            )
+            return response({
+                "value": enriched_packages,
+                "count": len(enriched_packages),
+                "importSummary": {
+                    "detailsRetrieved": len(enriched_packages),
+                    "usedAgentsMissingActiveUsers": used_without_active_users,
+                },
+            })
         if not next_url.startswith(GRAPH_PACKAGES_URL):
             return response({"error": {"message": "Microsoft Graph returned an invalid continuation URL."}}, 502)
 

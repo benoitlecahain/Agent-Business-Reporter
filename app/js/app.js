@@ -22,8 +22,8 @@ async function readSnapshot() {
     throw error;
   }
 }
-async function writeSnapshot(value) {
-  const snapshot = { tenantId: account.tenantId, importedAt: new Date().toISOString(), value };
+async function writeSnapshot(value, importSummary) {
+  const snapshot = { tenantId: account.tenantId, importedAt: new Date().toISOString(), importSummary, value };
   const root = await navigator.storage.getDirectory();
   const handle = await root.getFileHandle(snapshotFileName(), { create: true });
   const writable = await handle.createWritable();
@@ -100,14 +100,15 @@ function filteredPackages() {
   const lastUsed = elements.lastUsedFilter.value;
   const status = elements.statusFilter.value;
   return packages.filter((item) => {
-    const usage = Number(item.activeUsers || 0);
+    const hasUsage = item.activeUsers != null;
+    const usage = hasUsage ? Number(item.activeUsers) : null;
     const usedDate = item.lastUsedDateTime ? new Date(item.lastUsedDateTime) : null;
     const usedAfter = lastUsed !== "all" && lastUsed !== "never" ? Date.now() - Number(lastUsed) * 86400000 : null;
     return (!query || (item.displayName || "").toLocaleLowerCase().includes(query))
       && (publisher === "all" || item.publisher === publisher)
       && (platform === "all" || item.platform === platform)
       && (host === "all" || item.supportedHosts?.includes(host))
-      && (activeUsers === "all" || (activeUsers === "none" ? usage === 0 : usage >= Number(activeUsers)))
+      && (activeUsers === "all" || (activeUsers === "none" ? usage === 0 : hasUsage && usage >= Number(activeUsers)))
       && (lastUsed === "all" || (lastUsed === "never" ? !usedDate : usedDate && !Number.isNaN(usedDate.getTime()) && usedDate.getTime() >= usedAfter))
       && (status === "all" || (status === "blocked" ? item.isBlocked : !item.isBlocked));
   });
@@ -153,7 +154,7 @@ function renderTable() {
     name.append(createElement("strong", "", item.displayName || "Unnamed agent"), createElement("span", "", item.shortDescription || item.id));
     nameCell.append(name);
     const hostsCell = document.createElement("td"); appendChips(hostsCell, item.supportedHosts);
-    const usageCell = createElement("td", "usage-value", item.activeUsers == null ? "Not available" : Number(item.activeUsers).toLocaleString());
+    const usageCell = createElement("td", "usage-value", item.activeUsers == null ? "Not returned by Graph" : Number(item.activeUsers).toLocaleString());
     const distributionCell = document.createElement("td"); appendChips(distributionCell, distributionLabels(item));
     const statusCell = document.createElement("td"); statusCell.append(createElement("span", `status ${item.isBlocked ? "blocked" : "available"}`, item.isBlocked ? "Blocked" : "Available"));
     const actionCell = document.createElement("td");
@@ -166,7 +167,13 @@ function renderTable() {
 function useSnapshot(snapshot) {
   packages = Array.isArray(snapshot?.value) ? snapshot.value : [];
   hasSnapshot = Boolean(snapshot);
-  elements.snapshotStatus.textContent = snapshot ? `Imported ${new Date(snapshot.importedAt).toLocaleString()}` : "No data imported";
+  if (snapshot) {
+    const details = snapshot.importSummary?.detailsRetrieved;
+    const missingUsage = snapshot.importSummary?.usedAgentsMissingActiveUsers;
+    const detailStatus = Number.isInteger(details) ? ` · ${details}/${snapshot.value.length} details` : "";
+    const usageStatus = missingUsage ? ` · ${missingUsage} used without usage returned` : "";
+    elements.snapshotStatus.textContent = `Imported ${new Date(snapshot.importedAt).toLocaleString()}${detailStatus}${usageStatus}`;
+  } else elements.snapshotStatus.textContent = "No data imported";
   updateMetrics();
   updateFilterOptions();
   elements.loadingState.hidden = true;
@@ -183,7 +190,7 @@ async function importPackages() {
   try {
     const payload = await apiRequest("/api/packages");
     const importedPackages = Array.isArray(payload.value) ? payload.value : [];
-    useSnapshot(await writeSnapshot(importedPackages));
+    useSnapshot(await writeSnapshot(importedPackages, payload.importSummary));
     showToast(`Imported ${importedPackages.length} agents.`);
   }
   catch (error) { showError(error); }
