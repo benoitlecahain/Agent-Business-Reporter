@@ -45,7 +45,7 @@
     <section id="dashboardView" class="dashboard" hidden>
       <div class="page-heading">
         <div><p class="eyebrow">Organization catalog</p><h1>Agent inventory</h1></div>
-        <button id="refreshButton" class="button secondary" type="button"><i data-lucide="refresh-cw"></i><span>Refresh</span></button>
+        <button id="importButton" class="button secondary" type="button"><i data-lucide="download"></i><span>Import</span></button>
       </div>
       <div class="metrics" aria-label="Inventory summary">
         <article class="metric"><span>Total agents</span><strong id="totalMetric">0</strong></article>
@@ -55,7 +55,7 @@
       </div>
       <section class="inventory" aria-labelledby="inventoryTitle">
         <div class="inventory-header">
-          <div><h2 id="inventoryTitle">Agents</h2><p id="resultCount" class="muted">0 results</p></div>
+          <div><h2 id="inventoryTitle">Agents</h2><p id="resultCount" class="muted">0 results</p><p id="snapshotStatus" class="muted">No data imported</p></div>
           <div class="filters">
             <label class="search-field"><i data-lucide="search"></i><span class="sr-only">Search by agent name</span><input id="searchInput" type="search" placeholder="Search by agent name"></label>
             <label class="select-field"><span class="sr-only">Filter by publisher</span><select id="publisherFilter"><option value="all">All publishers</option></select></label>
@@ -67,9 +67,9 @@
             <button id="clearFiltersButton" class="button secondary clear-filters" type="button"><i data-lucide="filter-x"></i><span>Clear filters</span></button>
           </div>
         </div>
-        <div id="loadingState" class="state" hidden><span class="spinner" aria-hidden="true"></span><p>Loading your organization’s agents…</p></div>
-        <div id="errorState" class="state error-state" role="alert" hidden><i data-lucide="circle-alert"></i><h3>We couldn’t load the catalog</h3><p id="errorMessage"></p><button id="retryButton" class="button secondary" type="button">Try again</button></div>
-        <div id="emptyState" class="state" hidden><i data-lucide="package-open"></i><h3>No matching agents</h3><p>Adjust your filters or refresh the catalog.</p></div>
+        <div id="loadingState" class="state" hidden><span class="spinner" aria-hidden="true"></span><p>Importing your organization’s agents…</p></div>
+        <div id="errorState" class="state error-state" role="alert" hidden><i data-lucide="circle-alert"></i><h3>We couldn’t import the catalog</h3><p id="errorMessage"></p><button id="retryButton" class="button secondary" type="button">Try again</button></div>
+        <div id="emptyState" class="state" hidden><i data-lucide="package-open"></i><h3 id="emptyTitle">No imported data</h3><p id="emptyMessage">Select Import to create a local snapshot.</p></div>
         <div id="tableWrap" class="table-wrap" hidden>
           <table><thead><tr><th scope="col">Agent</th><th scope="col">Publisher</th><th scope="col">Platform</th><th scope="col">Hosts</th><th scope="col">Active users</th><th scope="col">Last used</th><th scope="col">Distribution</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Open details</span></th></tr></thead><tbody id="agentRows"></tbody></table>
         </div>

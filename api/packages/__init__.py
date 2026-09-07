@@ -27,7 +27,7 @@ def enrich_package(package: dict, token: str) -> dict:
         return package
 
     detail = detail_response.json()
-    return detail if isinstance(detail, dict) else package
+    return {**package, **detail} if isinstance(detail, dict) else package
 
 
 def enrich_packages(packages: list[dict], token: str) -> list[dict]:

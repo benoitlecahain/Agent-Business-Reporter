@@ -1,13 +1,36 @@
 const CLIENT_ID = "5f8259cb-61e1-402e-8d38-f38fe1a2db31";
 const GRAPH_SCOPES = ["https://graph.microsoft.com/CopilotPackages.Read.All"];
+const SNAPSHOT_PREFIX = "agent-inventory";
 const elements = Object.fromEntries([
-  "signedOutView", "dashboardView", "signInButton", "signOutButton", "accountBlock", "accountName", "tenantName", "refreshButton", "retryButton", "searchInput", "publisherFilter", "platformFilter", "hostFilter", "activeUsersFilter", "lastUsedFilter", "statusFilter", "clearFiltersButton", "loadingState", "errorState", "errorMessage", "emptyState", "tableWrap", "agentRows", "resultCount", "totalMetric", "availableMetric", "blockedMetric", "publisherMetric", "drawerBackdrop", "drawerTitle", "drawerContent", "closeDrawerButton", "themeButton", "toast"
+  "signedOutView", "dashboardView", "signInButton", "signOutButton", "accountBlock", "accountName", "tenantName", "importButton", "retryButton", "searchInput", "publisherFilter", "platformFilter", "hostFilter", "activeUsersFilter", "lastUsedFilter", "statusFilter", "clearFiltersButton", "loadingState", "errorState", "errorMessage", "emptyState", "emptyTitle", "emptyMessage", "tableWrap", "agentRows", "resultCount", "snapshotStatus", "totalMetric", "availableMetric", "blockedMetric", "publisherMetric", "drawerBackdrop", "drawerTitle", "drawerContent", "closeDrawerButton", "themeButton", "toast"
 ].map((id) => [id, document.querySelector(`#${id}`)]));
 elements.drawer = document.querySelector("#detailDrawer");
 let msalClient;
 let account;
 let packages = [];
+let hasSnapshot = false;
 let lastFocusedElement;
+
+function snapshotFileName() { return `${SNAPSHOT_PREFIX}-${account.tenantId.replace(/[^a-z0-9-]/gi, "_")}.json`; }
+async function readSnapshot() {
+  const root = await navigator.storage.getDirectory();
+  try {
+    const handle = await root.getFileHandle(snapshotFileName());
+    return JSON.parse(await (await handle.getFile()).text());
+  } catch (error) {
+    if (error.name === "NotFoundError") return null;
+    throw error;
+  }
+}
+async function writeSnapshot(value) {
+  const snapshot = { tenantId: account.tenantId, importedAt: new Date().toISOString(), value };
+  const root = await navigator.storage.getDirectory();
+  const handle = await root.getFileHandle(snapshotFileName(), { create: true });
+  const writable = await handle.createWritable();
+  await writable.write(JSON.stringify(snapshot));
+  await writable.close();
+  return snapshot;
+}
 
 function createElement(tag, className, text) {
   const element = document.createElement(tag);
@@ -38,9 +61,9 @@ async function apiRequest(path) {
   if (!response.ok) { const error = new Error(payload.error?.message || `Request failed with status ${response.status}.`); error.status = response.status; throw error; }
   return payload;
 }
-function showLoading() { elements.loadingState.hidden = false; elements.errorState.hidden = true; elements.emptyState.hidden = true; elements.tableWrap.hidden = true; elements.refreshButton.disabled = true; }
+function showLoading() { elements.loadingState.hidden = false; elements.errorState.hidden = true; elements.emptyState.hidden = true; elements.tableWrap.hidden = true; elements.importButton.disabled = true; }
 function showError(error) {
-  elements.loadingState.hidden = true; elements.tableWrap.hidden = true; elements.emptyState.hidden = true; elements.errorState.hidden = false; elements.refreshButton.disabled = false;
+  elements.loadingState.hidden = true; elements.tableWrap.hidden = true; elements.emptyState.hidden = true; elements.errorState.hidden = false; elements.importButton.disabled = false;
   elements.errorMessage.textContent = error.status === 403 ? "Your tenant may need admin consent for CopilotPackages.Read.All or an Agent 365 license." : error.message;
   refreshIcons();
 }
@@ -119,6 +142,8 @@ function renderTable() {
   const visible = filteredPackages();
   elements.agentRows.replaceChildren();
   elements.resultCount.textContent = `${visible.length} ${visible.length === 1 ? "result" : "results"}`;
+  elements.emptyTitle.textContent = hasSnapshot ? "No matching agents" : "No imported data";
+  elements.emptyMessage.textContent = hasSnapshot ? "Adjust your filters or import a new snapshot." : "Select Import to create a local snapshot.";
   elements.emptyState.hidden = visible.length !== 0;
   elements.tableWrap.hidden = visible.length === 0;
   visible.forEach((item) => {
@@ -138,9 +163,29 @@ function renderTable() {
   });
   refreshIcons();
 }
-async function loadPackages() {
+function useSnapshot(snapshot) {
+  packages = Array.isArray(snapshot?.value) ? snapshot.value : [];
+  hasSnapshot = Boolean(snapshot);
+  elements.snapshotStatus.textContent = snapshot ? `Imported ${new Date(snapshot.importedAt).toLocaleString()}` : "No data imported";
+  updateMetrics();
+  updateFilterOptions();
+  elements.loadingState.hidden = true;
+  elements.errorState.hidden = true;
+  elements.importButton.disabled = false;
+  renderTable();
+}
+async function loadSnapshot() {
+  try { useSnapshot(await readSnapshot()); }
+  catch (error) { showError(new Error(`The local snapshot could not be opened. ${error.message}`)); }
+}
+async function importPackages() {
   showLoading();
-  try { const payload = await apiRequest("/api/packages"); packages = Array.isArray(payload.value) ? payload.value : []; updateMetrics(); updateFilterOptions(); elements.loadingState.hidden = true; elements.refreshButton.disabled = false; renderTable(); }
+  try {
+    const payload = await apiRequest("/api/packages");
+    const importedPackages = Array.isArray(payload.value) ? payload.value : [];
+    useSnapshot(await writeSnapshot(importedPackages));
+    showToast(`Imported ${importedPackages.length} agents.`);
+  }
   catch (error) { showError(error); }
 }
 function detailItem(label, value) { const wrapper = createElement("div", "detail-item"); wrapper.append(createElement("dt", "", label), createElement("dd", "", value ?? "Not specified")); return wrapper; }
@@ -156,13 +201,12 @@ function renderDetails(item) {
   const chips = createElement("div", "chips"); [...(item.supportedHosts || []), ...(item.elementTypes || []), ...(item.categories || [])].forEach((value) => chips.append(createElement("span", "chip", value))); capabilities.append(chips); elements.drawerContent.append(capabilities);
   if (item.elementDetails?.length) { const definitions = createElement("section", "detail-section"); definitions.append(createElement("h3", "", "Element definitions"), createElement("pre", "code-block", JSON.stringify(item.elementDetails, null, 2))); elements.drawerContent.append(definitions); }
 }
-async function openDetails(summary) {
-  lastFocusedElement = document.activeElement; elements.drawerTitle.textContent = summary.displayName || "Agent"; elements.drawerContent.replaceChildren(createElement("p", "muted", "Loading details…")); elements.drawerBackdrop.hidden = false; elements.drawer.classList.add("open"); elements.drawer.setAttribute("aria-hidden", "false"); elements.closeDrawerButton.focus();
-  try { renderDetails(await apiRequest(`/api/packages/${encodeURIComponent(summary.id)}`)); } catch (error) { elements.drawerContent.replaceChildren(createElement("p", "", error.message)); }
+function openDetails(snapshotItem) {
+  lastFocusedElement = document.activeElement; elements.drawerBackdrop.hidden = false; elements.drawer.classList.add("open"); elements.drawer.setAttribute("aria-hidden", "false"); renderDetails(snapshotItem); elements.closeDrawerButton.focus();
 }
 function closeDetails() { elements.drawer.classList.remove("open"); elements.drawer.setAttribute("aria-hidden", "true"); window.setTimeout(() => { elements.drawerBackdrop.hidden = true; }, 220); lastFocusedElement?.focus(); }
 async function signIn() {
-  try { const result = await msalClient.loginPopup({ scopes: GRAPH_SCOPES, prompt: "select_account" }); account = result.account; msalClient.setActiveAccount(account); setView(true); await loadPackages(); }
+  try { const result = await msalClient.loginPopup({ scopes: GRAPH_SCOPES, prompt: "select_account" }); account = result.account; msalClient.setActiveAccount(account); setView(true); await loadSnapshot(); }
   catch (error) { showToast(error.message || "Sign-in was not completed."); }
 }
 async function signOut() { await msalClient.logoutRedirect({ account, postLogoutRedirectUri: window.location.origin }); }
@@ -173,12 +217,12 @@ async function initialize() {
   await msalClient.initialize();
   const redirectResult = await msalClient.handleRedirectPromise();
   account = redirectResult?.account || msalClient.getActiveAccount() || msalClient.getAllAccounts()[0];
-  if (account) { msalClient.setActiveAccount(account); setView(true); await loadPackages(); } else setView(false);
+  if (account) { msalClient.setActiveAccount(account); setView(true); await loadSnapshot(); } else setView(false);
 }
 elements.signInButton.addEventListener("click", signIn);
 elements.signOutButton.addEventListener("click", signOut);
-elements.refreshButton.addEventListener("click", loadPackages);
-elements.retryButton.addEventListener("click", loadPackages);
+elements.importButton.addEventListener("click", importPackages);
+elements.retryButton.addEventListener("click", importPackages);
 elements.searchInput.addEventListener("input", renderTable);
 [elements.publisherFilter, elements.platformFilter, elements.hostFilter, elements.activeUsersFilter, elements.lastUsedFilter, elements.statusFilter].forEach((select) => select.addEventListener("change", renderTable));
 elements.clearFiltersButton.addEventListener("click", clearFilters);

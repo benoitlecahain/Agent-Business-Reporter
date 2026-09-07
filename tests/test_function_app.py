@@ -97,3 +97,19 @@ def test_list_packages_requires_bearer_token() -> None:
     response = list_packages(request)
 
     assert response.status_code == 401
+
+
+@patch("shared_code.graph.requests.get")
+def test_list_packages_preserves_summary_fields_missing_from_detail(graph_get: Mock) -> None:
+    graph_get.side_effect = [
+        Mock(ok=True, json=lambda: {"value": [{"id": "package-1", "activeUsers": 27}]}),
+        Mock(ok=True, json=lambda: {"id": "package-1", "displayName": "Agent Builder agent"}),
+    ]
+
+    response = list_packages(make_request("https://localhost/api/packages"))
+
+    assert json.loads(response.get_body())["value"][0] == {
+        "id": "package-1",
+        "displayName": "Agent Builder agent",
+        "activeUsers": 27,
+    }
