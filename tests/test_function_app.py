@@ -25,22 +25,46 @@ def make_request(url: str, route_params: dict[str, str] | None = None) -> func.H
 
 @patch("shared_code.graph.requests.get")
 def test_list_packages_filters_agents_and_forwards_token(graph_get: Mock) -> None:
-    graph_get.return_value = Mock(
-        ok=True,
-        json=lambda: {"value": [{"id": "package-1", "displayName": "HR Agent"}]},
-    )
+    graph_get.side_effect = [
+        Mock(ok=True, json=lambda: {"value": [{"id": "package-1", "displayName": "HR Agent"}]}),
+        Mock(
+            ok=True,
+            json=lambda: {
+                "id": "package-1",
+                "displayName": "HR Agent",
+                "activeUsers": 14,
+                "lastUsedDateTime": "2026-09-06T08:30:00Z",
+                "type": "shared",
+                "sharedWithUsersAndGroups": [{"id": "user-1", "type": "user"}],
+            },
+        ),
+    ]
 
     response = list_packages(make_request("https://localhost/api/packages"))
 
     assert response.status_code == 200
     assert json.loads(response.get_body()) == {
-        "value": [{"id": "package-1", "displayName": "HR Agent"}],
+        "value": [{
+            "id": "package-1",
+            "displayName": "HR Agent",
+            "activeUsers": 14,
+            "lastUsedDateTime": "2026-09-06T08:30:00Z",
+            "type": "shared",
+            "sharedWithUsersAndGroups": [{"id": "user-1", "type": "user"}],
+        }],
         "count": 1,
     }
-    graph_get.assert_called_once_with(
+    assert graph_get.call_count == 2
+    graph_get.assert_any_call(
         GRAPH_PACKAGES_URL,
         headers={"Authorization": "Bearer graph-token", "Accept": "application/json"},
         params={"$filter": AGENTS_FILTER},
+        timeout=30,
+    )
+    graph_get.assert_any_call(
+        f"{GRAPH_PACKAGES_URL}/package-1",
+        headers={"Authorization": "Bearer graph-token", "Accept": "application/json"},
+        params=None,
         timeout=30,
     )
 

@@ -64,6 +64,22 @@ function appendChips(cell, values) {
   (values?.length ? values : ["Not specified"]).forEach((value) => wrapper.append(createElement("span", "chip", value)));
   cell.append(wrapper);
 }
+function formatDate(value) {
+  if (!value) return "Never";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Not available" : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+function distributionLabels(item) {
+  const labels = [];
+  const sharedCount = item.sharedWithUsersAndGroups?.length || 0;
+  const installedCount = item.acquireUsersAndGroups?.length || 0;
+  if (sharedCount) labels.push(`Shared with ${sharedCount}`);
+  else if (item.type === "shared") labels.push("Shared via link");
+  if (installedCount) labels.push(`Installed by ${installedCount}`);
+  if (item.deployedTo && item.deployedTo !== "none") labels.push(`Published to ${item.deployedTo}`);
+  if (!labels.length && item.availableTo && item.availableTo !== "none") labels.push(`Available to ${item.availableTo}`);
+  return labels.length ? labels : ["Not distributed"];
+}
 function renderTable() {
   const visible = filteredPackages();
   elements.agentRows.replaceChildren();
@@ -77,10 +93,12 @@ function renderTable() {
     name.append(createElement("strong", "", item.displayName || "Unnamed agent"), createElement("span", "", item.shortDescription || item.id));
     nameCell.append(name);
     const hostsCell = document.createElement("td"); appendChips(hostsCell, item.supportedHosts);
+    const usageCell = createElement("td", "usage-value", item.activeUsers == null ? "Not available" : Number(item.activeUsers).toLocaleString());
+    const distributionCell = document.createElement("td"); appendChips(distributionCell, distributionLabels(item));
     const statusCell = document.createElement("td"); statusCell.append(createElement("span", `status ${item.isBlocked ? "blocked" : "available"}`, item.isBlocked ? "Blocked" : "Available"));
     const actionCell = document.createElement("td");
     const action = createElement("button", "icon-button row-button"); action.type = "button"; action.title = `Open ${item.displayName || "agent"} details`; action.setAttribute("aria-label", action.title); action.append(icon("chevron-right")); action.addEventListener("click", () => openDetails(item)); actionCell.append(action);
-    row.append(nameCell, createElement("td", "", item.publisher || "Unknown"), createElement("td", "", item.platform || "Not specified"), hostsCell, statusCell, actionCell);
+    row.append(nameCell, createElement("td", "", item.publisher || "Unknown"), createElement("td", "", item.platform || "Not specified"), hostsCell, usageCell, createElement("td", "date-value", formatDate(item.lastUsedDateTime)), distributionCell, statusCell, actionCell);
     elements.agentRows.append(row);
   });
   refreshIcons();
@@ -97,7 +115,7 @@ function renderDetails(item) {
   if (item.longDescription || item.shortDescription) elements.drawerContent.append(createElement("p", "", item.longDescription || item.shortDescription));
   const overview = createElement("section", "detail-section"); overview.append(createElement("h3", "", "Overview"));
   const grid = createElement("dl", "detail-grid");
-  grid.append(detailItem("Publisher", item.publisher), detailItem("Status", item.isBlocked ? "Blocked" : "Available"), detailItem("Type", item.type), detailItem("Platform", item.platform), detailItem("Version", item.version), detailItem("Last modified", item.lastModifiedDateTime ? new Date(item.lastModifiedDateTime).toLocaleString() : null), detailItem("Available to", item.availableTo), detailItem("Deployed to", item.deployedTo), detailItem("Package ID", item.id), detailItem("Application ID", item.appId));
+  grid.append(detailItem("Publisher", item.publisher), detailItem("Status", item.isBlocked ? "Blocked" : "Available"), detailItem("Type", item.type), detailItem("Platform", item.platform), detailItem("Version", item.version), detailItem("Last modified", item.lastModifiedDateTime ? new Date(item.lastModifiedDateTime).toLocaleString() : null), detailItem("Active users", item.activeUsers == null ? null : Number(item.activeUsers).toLocaleString()), detailItem("Last used", item.lastUsedDateTime ? new Date(item.lastUsedDateTime).toLocaleString() : "Never"), detailItem("Total sessions", item.totalSessions == null ? null : Number(item.totalSessions).toLocaleString()), detailItem("Runtime", item.totalRunTimeInHours == null ? null : `${Number(item.totalRunTimeInHours).toLocaleString()} hours`), detailItem("Available to", item.availableTo), detailItem("Deployed to", item.deployedTo), detailItem("Shared with", item.sharedWithUsersAndGroups?.length), detailItem("Installed by", item.acquireUsersAndGroups?.length), detailItem("Package ID", item.id), detailItem("Application ID", item.appId));
   overview.append(grid); elements.drawerContent.append(overview);
   const capabilities = createElement("section", "detail-section"); capabilities.append(createElement("h3", "", "Capabilities"));
   const chips = createElement("div", "chips"); [...(item.supportedHosts || []), ...(item.elementTypes || []), ...(item.categories || [])].forEach((value) => chips.append(createElement("span", "chip", value))); capabilities.append(chips); elements.drawerContent.append(capabilities);

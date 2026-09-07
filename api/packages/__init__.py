@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+
 import azure.functions as func
 
 from shared_code.graph import (
@@ -7,8 +9,34 @@ from shared_code.graph import (
     access_token,
     graph_error,
     graph_get,
+    package_url,
     response,
 )
+
+
+DETAIL_WORKERS = 8
+
+
+def enrich_package(package: dict, token: str) -> dict:
+    package_id = package.get("id")
+    if not package_id:
+        return package
+
+    detail_response = graph_get(package_url(package_id), token)
+    if not detail_response.ok:
+        return package
+
+    detail = detail_response.json()
+    return detail if isinstance(detail, dict) else package
+
+
+def enrich_packages(packages: list[dict], token: str) -> list[dict]:
+    if not packages:
+        return packages
+
+    worker_count = min(DETAIL_WORKERS, len(packages))
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        return list(executor.map(lambda package: enrich_package(package, token), packages))
 
 
 def main(request: func.HttpRequest) -> func.HttpResponse:
@@ -30,7 +58,8 @@ def main(request: func.HttpRequest) -> func.HttpResponse:
         next_url = payload.get("@odata.nextLink")
         params = None
         if not next_url:
-            return response({"value": packages, "count": len(packages)})
+            enriched_packages = enrich_packages(packages, token)
+            return response({"value": enriched_packages, "count": len(enriched_packages)})
         if not next_url.startswith(GRAPH_PACKAGES_URL):
             return response({"error": {"message": "Microsoft Graph returned an invalid continuation URL."}}, 502)
 

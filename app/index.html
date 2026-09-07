@@ -13,6 +13,7 @@
       document.documentElement.setAttribute("data-theme", theme);
     })();
   </script>
+  <link rel="icon" type="image/png" href="/images/agent-business-reporter-logo.png">
   <link rel="stylesheet" href="/css/style.css">
   <script defer src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@4.25.0/lib/msal-browser.min.js"></script>
   <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
@@ -21,7 +22,7 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/" aria-label="Agent Business Reporter home">
-      <span class="brand-mark"><i data-lucide="chart-no-axes-combined"></i></span>
+      <span class="brand-mark"><img src="/images/agent-business-reporter-logo.png" alt=""></span>
       <span>Agent Business Reporter</span>
     </a>
     <div class="identity">
@@ -39,12 +40,7 @@
         <button id="signInButton" class="button primary" type="button"><i data-lucide="log-in"></i><span>Sign in with Microsoft</span></button>
         <p class="requirement">Requires tenant consent for <strong>CopilotPackages.Read.All</strong>.</p>
       </div>
-      <div class="signal-grid" aria-hidden="true">
-        <div class="signal-cell accent"><i data-lucide="bot"></i></div>
-        <div class="signal-cell"><i data-lucide="shield-check"></i></div>
-        <div class="signal-cell"><i data-lucide="building-2"></i></div>
-        <div class="signal-cell wide"><span>365</span></div>
-      </div>
+      <div class="brand-visual"><img src="/images/agent-business-reporter-logo.png" alt="Agent Business Reporter"></div>
     </section>
     <section id="dashboardView" class="dashboard" hidden>
       <div class="page-heading">
@@ -69,7 +65,7 @@
         <div id="errorState" class="state error-state" role="alert" hidden><i data-lucide="circle-alert"></i><h3>We couldn’t load the catalog</h3><p id="errorMessage"></p><button id="retryButton" class="button secondary" type="button">Try again</button></div>
         <div id="emptyState" class="state" hidden><i data-lucide="package-open"></i><h3>No matching agents</h3><p>Adjust your filters or refresh the catalog.</p></div>
         <div id="tableWrap" class="table-wrap" hidden>
-          <table><thead><tr><th scope="col">Agent</th><th scope="col">Publisher</th><th scope="col">Platform</th><th scope="col">Hosts</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Open details</span></th></tr></thead><tbody id="agentRows"></tbody></table>
+          <table><thead><tr><th scope="col">Agent</th><th scope="col">Publisher</th><th scope="col">Platform</th><th scope="col">Hosts</th><th scope="col">Active users</th><th scope="col">Last used</th><th scope="col">Distribution</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Open details</span></th></tr></thead><tbody id="agentRows"></tbody></table>
         </div>
       </section>
     </section>
