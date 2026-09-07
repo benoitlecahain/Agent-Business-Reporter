@@ -16,7 +16,7 @@ def make_request(url: str, route_params: dict[str, str] | None = None) -> func.H
     return func.HttpRequest(
         method="GET",
         url=url,
-        headers={"X-MS-Graph-Token": "graph-token"},
+        headers={"X-Graph-Access-Token": "graph-token"},
         params={},
         route_params=route_params or {},
         body=None,

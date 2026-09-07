@@ -15,7 +15,7 @@ def response(payload: object, status_code: int = 200) -> func.HttpResponse:
 
 
 def access_token(request: func.HttpRequest) -> str | None:
-    token = request.headers.get("X-MS-Graph-Token", "")
+    token = request.headers.get("X-Graph-Access-Token", "")
     return token.strip() or None
 
 

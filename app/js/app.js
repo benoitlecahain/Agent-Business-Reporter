@@ -32,7 +32,7 @@ async function getAccessToken(interactive = true) {
 }
 async function apiRequest(path) {
   const token = await getAccessToken();
-  const response = await fetch(path, { headers: { "X-MS-Graph-Token": token } });
+  const response = await fetch(path, { headers: { "X-Graph-Access-Token": token } });
   let payload;
   try { payload = await response.json(); } catch { payload = {}; }
   if (!response.ok) { const error = new Error(payload.error?.message || `Request failed with status ${response.status}.`); error.status = response.status; throw error; }
